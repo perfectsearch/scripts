@@ -30,16 +30,8 @@ else
     directorymanager="cn=Directory Manager"
 fi
 
-if [ "$3" ] ; then
-    if [[ -f "$3" ]]; then
-        dmpwd=$(cat "$3")
-    else
-        echo "when prompted, provide the directory manager password"
-        echo -n "Password:"     
-        stty -echo      
-        read dmpwd      
-        stty echo
-    fi
+if [ "$3" -a -f "$3"] ; then
+    dmpwd=$(cat "$3")
 else
     echo "when prompted, provide the directory manager password"
     echo -n "Password:"     
