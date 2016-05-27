@@ -10,13 +10,37 @@ else
 fi
 
 if [ "$2" ] ; then
-    ldapport=$2
+    directorymanager="$2"
+else
+    directorymanager="cn=Directory Manager"
+fi
+
+if [ "$3" ] ; then
+    if [[ -f "$3" ]]; then
+        dmpwd=$(cat "$3")
+    else
+        echo "when prompted, provide the directory manager password"
+        echo -n "Password:"     
+        stty -echo      
+        read dmpwd      
+        stty echo
+    fi
+else
+    echo "when prompted, provide the directory manager password"
+    echo -n "Password:"     
+    stty -echo      
+    read dmpwd      
+    stty echo
+fi
+
+if [ "$4" ] ; then
+    ldapport=$4
 else
     ldapport=389
 fi
 
-if [ "$3" ] ; then
-    ldapsport=$3
+if [ "$5" ] ; then
+    ldapsport=$5
 else
     ldapsport=636
 fi
@@ -82,7 +106,7 @@ if [ -n "$needCA" -o -n "$needServerCert" -o -n "$needASCert" ] ; then
         chmod 400 $secdir/pwdfile.txt
     fi
 
-# 3. Create a "noise" file for your encryption mechanism: 
+# 3. Create a "noise" file for your encryption mechanism:
     if [ -f $secdir/noise.txt ] ; then
         echo "Using existing $secdir/noise.txt file"
     else
@@ -121,7 +145,7 @@ if test -n "$needCA" ; then
 # 5. Generate the encryption key:
     echo "Creating encryption key for CA"
     certutil -G $prefixarg -d $secdir -z $secdir/noise.txt -f $secdir/pwdfile.txt
-# 6. Generate the self-signed certificate: 
+# 6. Generate the self-signed certificate:
     echo "Creating self-signed CA certificate"
 # note - the basic constraints flag (-2) is required to generate a real CA cert
 # it asks 3 questions that cannot be supplied on the command line
@@ -273,17 +297,13 @@ fi
 
 # enable SSL in the directory server
 echo "Enabling SSL in the directory server"
-if [ -z "$DMPWD" ] ; then
-    echo "when prompted, provide the directory manager password"
-    echo -n "Password:"
-    stty -echo
-    read dmpwd
-    stty echo
+if [[ -f /opt/search/appliance5/conf/.manager_password ]]; then
+    dmpwd=$(cat /opt/search/appliance5/conf/.manager_password)
 else
-    dmpwd="$DMPWD"
+    dmpwd=$(cat /opt/search/appliance5/conf/.ldap_onbox_manager_password)
 fi
 
-ldapmodify -x -h localhost -p $ldapport -D "cn=directory manager" -w "$dmpwd" <<EOF
+ldapmodify -x -h localhost -p $ldapport -D "$directorymanager" -w "$dmpwd" <<EOF
 dn: cn=encryption,cn=config
 changetype: modify
 replace: nsSSLClientAuth
@@ -324,8 +344,8 @@ ldapsearch_attrval()
 if [ -n "$needASCert" ] ; then
     echo "Enabling SSL in the admin server"
 # find the directory server config entry DN
-    dsdn=`ldapsearch_attrval dn -x -LLL -h localhost -p $ldapport -D "cn=directory manager" -w "$dmpwd" -b o=netscaperoot "(&(objectClass=nsDirectoryServer)(serverhostname=$myhost)(nsserverport=$ldapport))"`
-    ldapmodify -x -h localhost -p $ldapport -D "cn=directory manager" -w "$dmpwd" <<EOF
+    dsdn=`ldapsearch_attrval dn -x -LLL -h localhost -p $ldapport -D "$directorymanager" -w "$dmpwd" -b o=netscaperoot "(&(objectClass=nsDirectoryServer)(serverhostname=$myhost)(nsserverport=$ldapport))"`
+    ldapmodify -x -h localhost -p $ldapport -D "$directorymanager" -w "$dmpwd" <<EOF
 dn: $dsdn
 changetype: modify
 replace: nsServerSecurity
@@ -337,8 +357,8 @@ nsSecureServerPort: $ldapsport
 EOF
 
 # find the admin server config entry DN
-    asdn=`ldapsearch_attrval dn -x -LLL -h localhost -p $ldapport -D "cn=directory manager" -w "$dmpwd" -b o=netscaperoot "(&(objectClass=nsAdminServer)(serverhostname=$myhost))"`
-    ldapmodify -x -h localhost -p $ldapport -D "cn=directory manager" -w "$dmpwd" <<EOF
+    asdn=`ldapsearch_attrval dn -x -LLL -h localhost -p $ldapport -D "$directorymanager" -w "$dmpwd" -b o=netscaperoot "(&(objectClass=nsAdminServer)(serverhostname=$myhost))"`
+    ldapmodify -x -h localhost -p $ldapport -D "$directorymanager" -w "$dmpwd" <<EOF
 dn: cn=configuration,$asdn
 changetype: modify
 replace: nsServerSecurity
@@ -348,3 +368,4 @@ EOF
 fi
 
 echo "Done.  You must restart the directory server and the admin server for the changes to take effect."
+restart-dirsrv
