@@ -297,11 +297,6 @@ fi
 
 # enable SSL in the directory server
 echo "Enabling SSL in the directory server"
-if [[ -f /opt/search/appliance5/conf/.manager_password ]]; then
-    dmpwd=$(cat /opt/search/appliance5/conf/.manager_password)
-else
-    dmpwd=$(cat /opt/search/appliance5/conf/.ldap_onbox_manager_password)
-fi
 
 ldapmodify -x -h localhost -p $ldapport -D "$directorymanager" -w "$dmpwd" <<EOF
 dn: cn=encryption,cn=config
